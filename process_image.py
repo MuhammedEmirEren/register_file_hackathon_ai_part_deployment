@@ -1,21 +1,15 @@
-from matplotlib import image
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from PIL import Image
 import torch
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from rembg import remove
 import os
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 from gradio_client import Client, handle_file
-import requests
-import shutil
 import json
 import google.generativeai as genai
 import base64
-from langchain_google_genai import ChatGoogleGenerativeAI
 import image_enhancement_option3_helper
 from dotenv import load_dotenv
 
