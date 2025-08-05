@@ -1,0 +1,13 @@
+[build]
+# Use build cache
+builder = "nixpacks"
+
+[deploy]
+# Increase timeout
+timeout = 1800  # 30 minutes
+
+# Environment variables
+[env]
+PYTHON_VERSION = "3.11"
+PIP_NO_CACHE_DIR = "1"
+PIP_DISABLE_PIP_VERSION_CHECK = "1"
