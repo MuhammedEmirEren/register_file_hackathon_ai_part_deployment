@@ -238,9 +238,9 @@ async def cleanup_processor(processor_id: str):
     else:
         raise HTTPException(status_code=404, detail="Processor not found")
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
+@app.get("/status")
+async def status_check():
+    """Status check endpoint with processor count"""
     return {"status": "healthy", "active_processors": len(processors)}
 
 @app.post("/get_search_results")
@@ -301,5 +301,5 @@ async def generate_background(promptFromUser: str):
 if __name__ == "__main__":
     import uvicorn
     import os
-    port = 8001
+    port = int(os.environ.get("PORT", 8001))
     uvicorn.run(app, host="0.0.0.0", port=port)
