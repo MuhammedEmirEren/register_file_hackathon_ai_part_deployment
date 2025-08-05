@@ -11,5 +11,6 @@ requests>=2.31.0,<2.32.0
 pydantic>=2.5.0,<2.6.0
 python-dotenv>=1.0.0,<1.1.0
 google-generativeai>=0.3.0,<0.4.0
+langchain-google-genai>=1.0.1,<2.0.0
 rembg>=2.0.0,<2.1.0
 gradio-client>=0.7.0,<1.0.0
