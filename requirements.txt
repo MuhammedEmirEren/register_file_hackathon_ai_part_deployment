@@ -13,3 +13,4 @@ google-genai
 langchain-google-genai
 rembg
 gradio-client
+matplotlib
