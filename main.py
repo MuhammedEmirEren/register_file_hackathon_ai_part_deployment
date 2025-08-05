@@ -16,7 +16,7 @@ app = FastAPI()
 # Add CORS middleware to allow frontend to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],  # React dev servers
+    allow_origins=["*"],  # Allow all origins for deployment, restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,6 +24,15 @@ app.add_middleware(
 
 # Store active processors
 processors = {}
+
+# Health check endpoint
+@app.get("/")
+def read_root():
+    return {"message": "Register File AI API is running!", "status": "healthy"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 class ImageEnhancementRequest(BaseModel):
     image_path: str
@@ -291,4 +300,6 @@ async def generate_background(promptFromUser: str):
     
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    import os
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
