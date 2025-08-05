@@ -1,3 +1,5 @@
+matplotlib
+onnxruntime
 fastapi
 uvicorn
 python-multipart
@@ -9,8 +11,8 @@ opencv-python-headless
 requests
 pydantic
 python-dotenv
+google-generativeai
 google-genai
 langchain-google-genai
 rembg
 gradio-client
-matplotlib
