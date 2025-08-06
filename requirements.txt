@@ -11,7 +11,8 @@ requests
 pydantic
 python-dotenv
 google-generativeai
+google-genai
 langchain-google-genai
 rembg
+gradio-client
 onnxruntime
-scikit-learn
