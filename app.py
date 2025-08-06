@@ -36,34 +36,13 @@ from starlette.requests import Request
 import logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        logger.info(f"Request: {request.method} {request.url}")
-        logger.info(f"Headers: {request.headers}")
-        response = await call_next(request)
-        logger.info(f"Response status: {response.status_code}")
-        return response
-
 app = FastAPI()
-
-# Add Logging Middleware
-app.add_middleware(LoggingMiddleware)
-
-# Add CORS middleware to allow frontend to call the API
-# Define allowed origins for CORS
-origins = [
-    "http://localhost",
-    "http://localhost:3000", 
-    "http://localhost:5173",  
-    "https://register-file-hackathon-ai-part-dep.vercel.app",  
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=[
+        "*"  # Allow all origins for deployment - be more restrictive in production
+    ],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -161,11 +140,32 @@ async def enhance_image(request: dict):
         if not PROCESS_IMAGE_AVAILABLE:
             raise HTTPException(status_code=503, detail="Image processing module not available")
         
+        print(f"Received request: {type(request)}")
+        print(f"Request keys: {request.keys()}")
+        
+        # Handle different request formats
         image_data = request.get("image_base64")
+        if image_data is None:
+            # Try alternative key names
+            image_data = request.get("base64") or request.get("imageData")
+        
         background_color = request.get("background")
 
         if not image_data:
             raise HTTPException(status_code=400, detail="image_base64 field is required")
+
+        print(f"Image data type: {type(image_data)}")
+        
+        # Handle if image_data is a dict (extract the actual base64 string)
+        if isinstance(image_data, dict):
+            # Try common keys for base64 data in dict
+            image_data = image_data.get("data") or image_data.get("base64") or image_data.get("image_base64")
+            if not image_data:
+                raise HTTPException(status_code=400, detail="No valid image data found in request")
+
+        # Ensure image_data is a string
+        if not isinstance(image_data, str):
+            raise HTTPException(status_code=400, detail=f"Image data must be a string, got {type(image_data)}")
 
         # Decode base64 image
         if image_data.startswith('data:image'):
@@ -173,8 +173,8 @@ async def enhance_image(request: dict):
         
         try:
             image_bytes = base64.b64decode(image_data)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid base64 image data")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid base64 image data: {str(e)}")
         
         # Create a temporary file for processing
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
@@ -371,7 +371,7 @@ async def generate_background(promptFromUser: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating background: {str(e)}")
 
-# Create Gradio interface for Hugging Face Spaces
+# Create Gradio app for Hugging Face Spaces compatibility
 import gradio as gr
 
 def gradio_interface():
@@ -397,17 +397,22 @@ def gradio_interface():
     The API is running on this Space and can be accessed programmatically.
     """
 
-# Create Gradio app
-iface = gr.Interface(
-    fn=gradio_interface,
-    inputs=[],
-    outputs=gr.Markdown(),
-    title="AI Image Enhancement API",
-    description="FastAPI backend for AI-powered image enhancement and processing"
-)
+# Only create Gradio interface if running on Hugging Face Spaces
+try:
+    # Create Gradio app
+    iface = gr.Interface(
+        fn=gradio_interface,
+        inputs=[],
+        outputs=gr.Markdown(),
+        title="AI Image Enhancement API",
+        description="FastAPI backend for AI-powered image enhancement and processing"
+    )
 
-# Mount Gradio app with FastAPI
-app = gr.mount_gradio_app(app, iface, path="/")
+    # Mount Gradio app ONLY at /gradio path to avoid conflicts
+    app = gr.mount_gradio_app(app, iface, path="/gradio")
+except Exception as e:
+    print(f"Gradio mounting failed: {e}")
+    # Continue without Gradio if it fails
 
 if __name__ == "__main__":
     import uvicorn

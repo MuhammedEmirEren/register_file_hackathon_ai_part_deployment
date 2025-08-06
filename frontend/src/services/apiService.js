@@ -61,6 +61,10 @@ class ApiService {
 
   async enhanceImage(imageBase64, background = null) {
     try {
+      console.log('Starting image enhancement...');
+      console.log('Image base64 length:', imageBase64 ? imageBase64.length : 'No image data');
+      console.log('Background:', background);
+
       const response = await fetch(`${this.baseURL}/enhance_and_return_all_options`, {
         method: 'POST',
         headers: {
@@ -72,11 +76,16 @@ class ApiService {
         }),
       });
 
+      console.log('Enhancement response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Enhancement error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Enhancement successful');
       
       // Store the processor ID for later use
       this.currentProcessorId = data.processor_id;
@@ -84,6 +93,7 @@ class ApiService {
       return data;
     } catch (error) {
       console.error('Error enhancing image:', error);
+      console.error('Error details:', error.message);
       throw error;
     }
   }
