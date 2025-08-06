@@ -12,6 +12,15 @@ class ApiService {
     try {
       console.log('Uploading image:', imageFile.name, imageFile.type, imageFile.size);
       
+      // Validate file before upload
+      if (!imageFile) {
+        throw new Error('No file provided');
+      }
+      
+      if (!imageFile.type.startsWith('image/')) {
+        throw new Error('File must be an image');
+      }
+      
       const formData = new FormData();
       formData.append('image', imageFile);
 
@@ -35,13 +44,18 @@ class ApiService {
       const data = await response.json();
       console.log('Upload successful:', data);
 
-      base64 = data.image_base64;
+      const base64 = data.image_base64;
 
-      // Save the image and return the path
-      return base64;
-      } catch (error) {
+      // Return the complete data including base64
+      return {
+        ...data,
+        base64: base64
+      };
+      
+    } catch (error) {
       console.error('Error uploading image:', error);
-      throw error;
+      console.error('Error details:', error.message);
+      throw new Error(`Upload failed: ${error.message}`);
     }
   }
 
