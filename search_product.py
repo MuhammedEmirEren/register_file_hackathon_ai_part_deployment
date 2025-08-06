@@ -55,7 +55,7 @@ class search_product:
         
         params = {
             'key': os.getenv("SEARCH_API_KEY"),
-            'cx': "068bf089d39b74b14",
+            'cx': os.getenv("GOOGLE_CSE_ID", "068bf089d39b74b14"),
             'q': query,
             'num': min(num_results, 10),
             'safe': 'active'
