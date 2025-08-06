@@ -9,19 +9,31 @@ class ApiService {
 
   async uploadImage(imageFile) {
     try {
+      console.log('Uploading image:', imageFile.name, imageFile.type, imageFile.size);
+      
       const formData = new FormData();
       formData.append('image', imageFile);
+
+      console.log('Making request to:', `${this.baseURL}/upload`);
 
       const response = await fetch(`${this.baseURL}/upload`, {
         method: 'POST',
         body: formData,
+        // Don't set Content-Type header for FormData, let browser set it automatically
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      return await response.json(); // Returns the full JSON response
+      const data = await response.json();
+      console.log('Upload successful:', data);
+      return data; // Returns the full JSON response
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
@@ -116,8 +128,10 @@ class ApiService {
     try {
       const response = await fetch(`${this.baseURL}/get_search_results?query=${encodeURIComponent(query)}`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -142,7 +156,10 @@ class ApiService {
   async generateBackgroundImage(prompt) {
     try {
       const response = await fetch(`${this.baseURL}/generate_background?promptFromUser=${encodeURIComponent(prompt)}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       
       if (!response.ok) {
