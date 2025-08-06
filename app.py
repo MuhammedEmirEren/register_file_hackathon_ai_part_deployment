@@ -6,7 +6,6 @@ except ImportError as e:
     PROCESS_IMAGE_AVAILABLE = False
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import shutil
@@ -15,6 +14,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 import uuid
+import tempfile
 
 try:
     from search_product import search_product
@@ -29,14 +29,41 @@ try:
 except ImportError as e:
     print(f"Warning: background_generator module not available: {e}")
     BACKGROUND_GEN_AVAILABLE = False
-from search_product import search_product
+
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger.info(f"Request: {request.method} {request.url}")
+        logger.info(f"Headers: {request.headers}")
+        response = await call_next(request)
+        logger.info(f"Response status: {response.status_code}")
+        return response
 
 app = FastAPI()
 
+# Add Logging Middleware
+app.add_middleware(LoggingMiddleware)
+
 # Add CORS middleware to allow frontend to call the API
+# Define allowed origins for CORS
+origins = [
+    "http://localhost",
+    "http://localhost:3000", 
+    "http://localhost:5173",  
+    "https://register-file-hackathon-ai-part-dep.vercel.app",  
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for deployment, restrict in production
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,7 +146,7 @@ async def upload_image(image: UploadFile = File(...)):
         return {
             "upload_id": upload_id,
             "filename": image.filename,
-            "image": image_base64,
+            "image_base64": image_base64,
             "width": pil_image.width,
             "height": pil_image.height
         }
@@ -128,39 +155,40 @@ async def upload_image(image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 @app.post("/enhance_and_return_all_options")
-async def enhance_image(request: ImageEnhancementRequest):
-    """Process image through all enhancement options"""
+async def enhance_image(request: dict):
+    """Process image through all enhancement options using base64 data"""
     try:
         if not PROCESS_IMAGE_AVAILABLE:
             raise HTTPException(status_code=503, detail="Image processing module not available")
-            
-        print(f"Starting enhancement for image: {request.image_path}")
-        background_color = request.background
-        print(f"Using background color: {background_color}")
+        
+        image_data = request.get("image_base64")
+        background_color = request.get("background")
+
+        if not image_data:
+            raise HTTPException(status_code=400, detail="image_base64 field is required")
+
+        # Decode base64 image
+        if image_data.startswith('data:image'):
+            image_data = image_data.split(',', 1)[1]
+        
+        try:
+            image_bytes = base64.b64decode(image_data)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid base64 image data")
+        
+        # Create a temporary file for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
+            temp_image.write(image_bytes)
+            temp_image_path = temp_image.name
+
+        print(f"Starting enhancement for temporary image: {temp_image_path}")
+        
         # Create a new processor instance
         processor_id = str(uuid.uuid4())
         img_processor = process_image()
         
-        # Check if the image path is absolute or relative
-        if os.path.isabs(request.image_path):
-            # If absolute path, convert to relative from the script directory
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            relative_path = os.path.relpath(request.image_path, script_dir)
-            image_path_to_use = relative_path
-        else:
-            # If relative path, use as is
-            image_path_to_use = request.image_path
-        
-        print(f"Using image path: {image_path_to_use}")
-        
-        # Check if file exists before processing
-        full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), image_path_to_use)
-        if not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail=f"Image file not found: {full_path}")
-        
-        # Process the image step by step with error handling
-        print("Step 1: Processing image...")
-        img_processor.process(image_path_to_use)
+        # Process the image step by step
+        img_processor.process(temp_image_path)
         
         img_processor.raw_image.save("processed_image.png")  # Save processed image for debugging
         
@@ -173,7 +201,8 @@ async def enhance_image(request: ImageEnhancementRequest):
         print("Step 3: Removing background...")
         img_processor.remove_background()
         
-        img_processor.no_background_image = apply_background(img_processor.no_background_image, background_color)
+        if background_color:
+            img_processor.no_background_image = apply_background(img_processor.no_background_image, background_color)
         
         img_processor.no_background_image.save("no_background_image.png")  # Save no background image for debugging
         
@@ -183,7 +212,6 @@ async def enhance_image(request: ImageEnhancementRequest):
             print("Enhancement option 1 completed")
         except Exception as e:
             print(f"Enhancement option 1 failed: {str(e)}")
-            # Set a placeholder or skip this enhancement
             img_processor.enhanced_image_1 = img_processor.no_background_image
         
         print("Step 5: Enhancement option 2...")
@@ -192,7 +220,6 @@ async def enhance_image(request: ImageEnhancementRequest):
             print("Enhancement option 2 completed")
         except Exception as e:
             print(f"Enhancement option 2 failed: {str(e)}")
-            # Set a placeholder or skip this enhancement
             img_processor.enhanced_image_2 = img_processor.no_background_image
         
         print("Step 6: Enhancement option 3...")
@@ -201,12 +228,14 @@ async def enhance_image(request: ImageEnhancementRequest):
             print("✓ Enhancement option 3 completed")
         except Exception as e:
             print(f"Enhancement option 3 failed: {str(e)}")
-            # Set a placeholder or skip this enhancement
             img_processor.enhanced_image_3 = img_processor.no_background_image
         
         # Store the processor for later use
         processors[processor_id] = img_processor
         print(f"Enhancement completed successfully. Processor ID: {processor_id}")
+        
+        # Clean up the temporary file
+        os.unlink(temp_image_path)
         
         # Convert PIL images to base64 for JSON response
         return {
@@ -217,11 +246,14 @@ async def enhance_image(request: ImageEnhancementRequest):
             "original_image": pil_image_to_base64(img_processor.raw_image),
             "no_background_image": pil_image_to_base64(img_processor.no_background_image)
         }
-    
+        
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Clean up temp file on error
+        if 'temp_image_path' in locals() and os.path.exists(temp_image_path):
+            os.unlink(temp_image_path)
+        
         print(f"Error during enhancement: {str(e)}")
         import traceback
         traceback.print_exc()

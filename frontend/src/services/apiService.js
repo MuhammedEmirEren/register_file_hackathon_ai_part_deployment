@@ -21,15 +21,14 @@ class ApiService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.file_path; // Returns the path where the file was saved
+      return await response.json(); // Returns the full JSON response
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
     }
   }
 
-  async enhanceImage(imagePath, background = null) {
+  async enhanceImage(imageBase64, background = null) {
     try {
       const response = await fetch(`${this.baseURL}/enhance_and_return_all_options`, {
         method: 'POST',
@@ -37,7 +36,7 @@ class ApiService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          image_path: imagePath,
+          image_base64: imageBase64,
           background: background
         }),
       });
@@ -154,9 +153,8 @@ class ApiService {
       console.log('API response data:', data); // Debug log
       
       return {
-        image: data.image,
-        filePath: data.file_path,
-        publicUrl: data.public_url,
+        image: data.image, // This is the base64 string
+        image_base64: data.image_base64,
         fileName: data.file_name
       };
     } catch (error) {
