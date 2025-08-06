@@ -1,4 +1,5 @@
 // API service for communicating with FastAPI backend
+// Update this URL to match your actual Hugging Face Space URL
 const API_BASE_URL = 'https://muhammedemireren-glowii.hf.space';
 
 class ApiService {
@@ -33,8 +34,12 @@ class ApiService {
 
       const data = await response.json();
       console.log('Upload successful:', data);
-      return data; // Returns the full JSON response
-    } catch (error) {
+
+      base64 = data.image_base64;
+
+      // Save the image and return the path
+      return base64;
+      } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
     }
@@ -113,14 +118,44 @@ class ApiService {
 
   async healthCheck() {
     try {
+      console.log('Testing health check with URL:', `${this.baseURL}/health`);
       const response = await fetch(`${this.baseURL}/health`);
+      console.log('Health check response status:', response.status);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Health check error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      
+      const data = await response.json();
+      console.log('Health check successful:', data);
+      return data;
     } catch (error) {
       console.error('Health check failed:', error);
       throw error;
+    }
+  }
+
+  // Method to test if the space is accessible
+  async testConnection() {
+    try {
+      console.log('Testing connection to:', this.baseURL);
+      const response = await fetch(this.baseURL);
+      console.log('Root endpoint response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Root endpoint response:', data);
+        return { success: true, data };
+      } else {
+        const errorText = await response.text();
+        console.error('Root endpoint error:', errorText);
+        return { success: false, error: errorText, status: response.status };
+      }
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return { success: false, error: error.message };
     }
   }
 
