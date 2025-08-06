@@ -42,9 +42,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store active processors and uploaded images
+# Store active processors
 processors = {}
-uploaded_images = {}  # upload_id -> file_path mapping
 
 # Health check endpoint
 @app.get("/")
@@ -111,116 +110,22 @@ async def upload_image(image: UploadFile = File(...)):
         # Convert to PIL Image
         pil_image = Image.open(BytesIO(image_data))
         
-        # Generate unique ID for this upload session
-        upload_id = str(uuid.uuid4())
-        
-        # Store in memory for processing (optional local save for debugging)
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        upload_dir = os.path.join(script_dir, "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Save locally for processing
-        file_extension = os.path.splitext(image.filename)[1] or '.jpg'
-        local_filename = f"{upload_id}{file_extension}"
-        local_file_path = os.path.join(upload_dir, local_filename)
-        
-        pil_image.save(local_file_path)
-        
         # Convert to base64 for frontend
         image_base64 = pil_image_to_base64(pil_image)
         
-        # Store the upload_id -> file_path mapping
-        uploaded_images[upload_id] = local_file_path
+        # Generate unique ID for this upload session
+        upload_id = str(uuid.uuid4())
         
         return {
             "upload_id": upload_id,
-            "file_path": f"uploads/{local_filename}",  # Relative path for processing
-            "filename": local_filename,
-            "image_base64": image_base64,
-            "image_url": f"/serve-image/{upload_id}",  # URL to serve the image
+            "filename": image.filename,
+            "image": image_base64,
             "width": pil_image.width,
             "height": pil_image.height
         }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
-
-@app.get("/serve-image/{upload_id}")
-async def serve_image(upload_id: str):
-    """Serve an uploaded image by its upload_id"""
-    try:
-        if upload_id not in uploaded_images:
-            raise HTTPException(status_code=404, detail="Image not found")
-        
-        file_path = uploaded_images[upload_id]
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Image file not found on disk")
-        
-        with Image.open(file_path) as img:
-            img_base64 = pil_image_to_base64(img)
-            return {"image_base64": img_base64, "upload_id": upload_id}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error serving image: {str(e)}")
-
-@app.post("/upload-base64")
-async def upload_base64_image(request: dict):
-    """Upload an image via base64 data"""
-    try:
-        if 'image_data' not in request:
-            raise HTTPException(status_code=400, detail="image_data field is required")
-        
-        image_data = request['image_data']
-        
-        # Handle data URLs (remove data:image/...;base64, prefix if present)
-        if image_data.startswith('data:image'):
-            image_data = image_data.split(',', 1)[1]
-        
-        # Decode base64
-        try:
-            image_bytes = base64.b64decode(image_data)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid base64 image data")
-        
-        # Convert to PIL Image
-        pil_image = Image.open(BytesIO(image_bytes))
-        
-        # Generate unique ID
-        upload_id = str(uuid.uuid4())
-        
-        # Save locally for processing
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        upload_dir = os.path.join(script_dir, "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        local_filename = f"{upload_id}.jpg"
-        local_file_path = os.path.join(upload_dir, local_filename)
-        
-        # Save as JPEG
-        if pil_image.mode in ('RGBA', 'LA', 'P'):
-            pil_image = pil_image.convert('RGB')
-        pil_image.save(local_file_path, 'JPEG', quality=95)
-        
-        # Store the mapping
-        uploaded_images[upload_id] = local_file_path
-        
-        # Convert back to base64 for response
-        image_base64 = pil_image_to_base64(pil_image)
-        
-        return {
-            "upload_id": upload_id,
-            "file_path": f"uploads/{local_filename}",
-            "filename": local_filename,
-            "image_base64": image_base64,
-            "image_url": f"/serve-image/{upload_id}",
-            "width": pil_image.width,
-            "height": pil_image.height
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing base64 image: {str(e)}")
 
 @app.post("/enhance_and_return_all_options")
 async def enhance_image(request: ImageEnhancementRequest):
@@ -424,19 +329,9 @@ async def generate_background(promptFromUser: str):
             encoded_image = pil_image_to_base64(img)
             if encoded_image is None:
                 raise HTTPException(status_code=500, detail="Error converting image to base64")
-            
-            # Generate unique ID for serving this background
-            bg_id = str(uuid.uuid4())
-            uploaded_images[bg_id] = image_path  # Store for serving
-            
-            return {
-                "image": encoded_image,
-                "image_base64": encoded_image,  # For consistency
-                "background_id": bg_id,
-                "serve_url": f"/serve-image/{bg_id}",
-                "file_name": file_name,
-                "prompt": promptFromUser
-            }
+            return {"image": encoded_image
+                    , "public_url": public_url, "file_name": file_name
+                    , "file_path": image_path}
             
     except Exception as e:
         print(f"Error generating background: {str(e)}")
