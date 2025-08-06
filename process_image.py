@@ -196,37 +196,64 @@ class process_image:
         return self.enhanced_image_1
 
     def enhance_image_option2(self):
+        try:
+            client = Client("finegrain/finegrain-image-enhancer")
 
-        client = Client("finegrain/finegrain-image-enhancer")
+            # Create a temporary file using tempfile module
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                # Save image to temporary file
+                self.no_background_image.save(temp_file.name)
+                temp_image_path = temp_file.name
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        output_path = os.path.join(script_dir, "temp_image.png")
+            try:
+                result = client.predict(
+                        input_image=handle_file(temp_image_path),
+                        prompt="",
+                        negative_prompt="",
+                        seed=0,
+                        upscale_factor=2.6,
+                        controlnet_scale=0.5,
+                        controlnet_decay=0.6,
+                        condition_scale=5,
+                        tile_width=200,
+                        tile_height=200,
+                        denoise_strength=0,
+                        num_inference_steps=23,
+                        solver="DPMSolver",
+                        api_name="/process"
+                )
+                
+                # Get the image from result[1] - local file path, not a URL
+                image_path = result[1]
+                self.enhanced_image_2 = Image.open(image_path)
+                
+                # Clean up temporary file
+                import os
+                try:
+                    os.unlink(temp_image_path)
+                except:
+                    pass  # Ignore cleanup errors
+                    
+                return self.enhanced_image_2
+                
+            except Exception as e:
+                # Clean up temporary file on error
+                import os
+                try:
+                    os.unlink(temp_image_path)
+                except:
+                    pass
+                
+                print(f"Finegrain API failed: {str(e)}")
+                self.enhanced_image_2 = self.no_background_image
+                return self.enhanced_image_2
 
-        self.no_background_image.save(output_path)
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        temp_image_path = os.path.join(script_dir, "temp_image.png")
-        result = client.predict(
-                input_image=handle_file(temp_image_path),
-                prompt="",
-                negative_prompt="",
-                seed=0,
-                upscale_factor=2.6,
-                controlnet_scale=0.5,
-                controlnet_decay=0.6,
-                condition_scale=5,
-                tile_width=200,
-                tile_height=200,
-                denoise_strength=0,
-                num_inference_steps=23,
-                solver="DPMSolver",
-                api_name="/process"
-        )
-        # Get the image from result[1] - local file path, not a URL
-        image_path = result[1]
-
-        self.enhanced_image_2 = Image.open(image_path)
-        return self.enhanced_image_2
+        except Exception as e:
+            print(f"Enhancement option 2 failed completely: {str(e)}")
+            # Return the no-background image as fallback
+            self.enhanced_image_2 = self.no_background_image
+            return self.enhanced_image_2
     
     def enhance_image_option3(self):
         enhancer = image_enhancement_option3_helper.image_enhancement_option3_helper(model=None)
