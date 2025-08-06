@@ -1,4 +1,4 @@
-from process_image import process_image
+from .process_image import process_image
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 import uuid
-from search_product import search_product
+from .search_product import search_product
 
 app = FastAPI()
 
@@ -269,7 +269,7 @@ async def get_search_results(query:str):
 async def generate_background(promptFromUser: str):
     """Generate a background image using Google GenAI"""
     try:
-        from background_generator import BackgroundGenerator
+        from .background_generator import BackgroundGenerator
         background_gen = BackgroundGenerator()
         print("Generating background image...")
         result = background_gen.generate(prompt=promptFromUser)
